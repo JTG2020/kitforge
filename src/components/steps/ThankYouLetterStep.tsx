@@ -4,12 +4,17 @@ import {
   DEFAULT_THANK_YOU_LETTER_INTAKE,
   ProjectState,
   ThankYouLetterIntake,
+  ThankYouImageProvider,
 } from '../../types/project';
 import { DEFAULT_PRODUCT_SPECS } from '../../config/products';
 import {
   generateGeminiTextCall,
   generateThankYouBackgroundCall,
 } from '../../services/gemini';
+import {
+  editThankYouBackgroundWithMuse,
+  generateThankYouBackgroundWithProvider,
+} from '../../services/thankYouImage';
 import {
   exportKitPdf,
   generatePreExportReport,
@@ -26,6 +31,8 @@ type LetterStage = 'intake' | 'copy' | 'prompt' | 'review';
 
 interface ThankYouLetterStepProps {
   imageApiKey: string;
+  imageProvider: ThankYouImageProvider;
+  metaImageApiKey: string;
   textApiKey: string;
   textModel: GeminiTextModel;
   project: ProjectState;
@@ -75,6 +82,8 @@ function parseModelJson<T>(response: string, model: GeminiTextModel): T {
 
 export const ThankYouLetterStep: React.FC<ThankYouLetterStepProps> = ({
   imageApiKey,
+  imageProvider,
+  metaImageApiKey,
   textApiKey,
   textModel,
   project,
@@ -101,6 +110,8 @@ export const ThankYouLetterStep: React.FC<ThankYouLetterStepProps> = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [editInstruction, setEditInstruction] = useState('');
+  const [isEditingBackground, setIsEditingBackground] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isAuditing, setIsAuditing] = useState(false);
   const [designApproved, setDesignApproved] = useState(false);
@@ -328,7 +339,8 @@ export const ThankYouLetterStep: React.FC<ThankYouLetterStepProps> = ({
 
   const handleApprovePromptAndGenerate = async () => {
     if (!backgroundPrompt.trim()) return;
-    if (!imageApiKey.trim()) {
+    const selectedApiKey = imageProvider === 'meta-muse' ? metaImageApiKey : imageApiKey;
+    if (!selectedApiKey.trim()) {
       onOpenSettings();
       return;
     }
@@ -337,12 +349,20 @@ export const ThankYouLetterStep: React.FC<ThankYouLetterStepProps> = ({
     setErrorMessage(null);
     setDesignApproved(false);
     try {
-      const dataUrl = await generateThankYouBackgroundCall(
-        imageApiKey,
-        LETTER_SPEC,
-        project.brandKit,
+      const references = intake.referenceImageDataUrl ? [intake.referenceImageDataUrl] : [];
+      const dataUrl = await generateThankYouBackgroundWithProvider(
+        imageProvider,
+        metaImageApiKey,
         backgroundPrompt,
-        intake.referenceImageDataUrl ? [intake.referenceImageDataUrl] : []
+        references,
+        LETTER_SPEC,
+        () => generateThankYouBackgroundCall(
+          imageApiKey,
+          LETTER_SPEC,
+          project.brandKit,
+          backgroundPrompt,
+          references
+        )
       );
       const variation: ArtworkVariation = {
         id: `thank_you_${Date.now()}`,
@@ -353,17 +373,57 @@ export const ThankYouLetterStep: React.FC<ThankYouLetterStepProps> = ({
           LETTER_SPEC.trimW + LETTER_SPEC.bleed * 2,
           LETTER_SPEC.trimH + LETTER_SPEC.bleed * 2
         ),
-        directionName: 'Photographic Thank You Letter background',
+        directionName: `${imageProvider === 'meta-muse' ? 'Meta Muse' : 'Gemini'} Thank You Letter background`,
         promptSnippet: backgroundPrompt,
       };
       onAddArtworkVariation(LETTER_FACE.id, variation);
       onSetFaceSelectedId(LETTER_FACE.id, variation.id);
-      onRecordCost(25);
+      onRecordCost(imageProvider === 'meta-muse' ? 1 : 25);
       setStage('review');
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'gemini-3-pro-image: Background generation failed.');
+      setErrorMessage(error instanceof Error ? error.message : 'Thank You background generation failed.');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleEditBackground = async () => {
+    const selectedVariation = faceState.variations.find((variation) => variation.id === faceState.selectedId);
+    if (!selectedVariation || !editInstruction.trim()) return;
+    if (!metaImageApiKey.trim()) {
+      onOpenSettings();
+      return;
+    }
+
+    setIsEditingBackground(true);
+    setErrorMessage(null);
+    setDesignApproved(false);
+    try {
+      const dataUrl = await editThankYouBackgroundWithMuse(
+        metaImageApiKey,
+        selectedVariation.dataUrl,
+        editInstruction,
+        LETTER_SPEC
+      );
+      const variation: ArtworkVariation = {
+        id: `thank_you_${Date.now()}`,
+        createdAt: Date.now(),
+        dataUrl,
+        resolution: selectedVariation.resolution,
+        aspectRatio: selectedVariation.aspectRatio,
+        directionName: 'Meta Muse Thank You Letter background edit',
+        promptSnippet: selectedVariation.promptSnippet,
+        instruction: editInstruction,
+        parentVariationId: selectedVariation.id,
+      };
+      onAddArtworkVariation(LETTER_FACE.id, variation);
+      onSetFaceSelectedId(LETTER_FACE.id, variation.id);
+      onRecordCost(1);
+      setEditInstruction('');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Muse Image: Background edit failed.');
+    } finally {
+      setIsEditingBackground(false);
     }
   };
 
@@ -667,6 +727,30 @@ export const ThankYouLetterStep: React.FC<ThankYouLetterStepProps> = ({
               />
             </div>
             <div className="space-y-4">
+              {imageProvider === 'meta-muse' && faceState.variations.some((variation) => variation.id === faceState.selectedId) && (
+                <div className="space-y-2 border-b border-line pb-4">
+                  <label htmlFor="thank-you-background-edit" className="block text-xs font-semibold uppercase tracking-wide text-ink/70">
+                    Edit background with Muse
+                  </label>
+                  <textarea
+                    id="thank-you-background-edit"
+                    value={editInstruction}
+                    onChange={(event) => setEditInstruction(event.target.value)}
+                    rows={3}
+                    placeholder="Describe the change to make to this background"
+                    className="w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm focus:border-brand focus:outline-none"
+                  />
+                  <p className="text-[11px] text-ink/60">Muse edits by instruction rather than a mask; review the full result before selecting it.</p>
+                  <button
+                    type="button"
+                    onClick={() => void handleEditBackground()}
+                    disabled={!editInstruction.trim() || isEditingBackground || isGenerating}
+                    className="rounded-lg border border-line bg-panel px-3 py-2 text-xs font-medium text-ink hover:bg-shell disabled:opacity-45"
+                  >
+                    {isEditingBackground ? 'Editing background…' : 'Create edited variation'}
+                  </button>
+                </div>
+              )}
               {renderCopyEditor()}
               <label className="flex items-start gap-2 border-t border-line pt-4 text-xs text-ink">
                 <input type="checkbox" checked={designApproved} onChange={(event) => setDesignApproved(event.target.checked)} className="mt-0.5 accent-brand" />

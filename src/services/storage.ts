@@ -1,6 +1,5 @@
-import { ProjectState } from '../types/project';
-import { SettingsState } from '../types/project';
-import { DEFAULT_GEMINI_TEXT_MODEL, resolveGeminiTextModel } from '../config/textModels';
+import type { ProjectState, SettingsState } from '../types/project';
+import { DEFAULT_GEMINI_TEXT_MODEL, resolveGeminiTextModel } from '../config/textModels.ts';
 
 const DB_NAME = 'kitforge_pixels_v1';
 const STORE_NAME = 'images';
@@ -285,6 +284,8 @@ export function loadSettings(): SettingsState {
         ...settings,
         textApiKey: settings.textApiKey || '',
         textModel: resolveGeminiTextModel(settings.textModel),
+        thankYouImageProvider: settings.thankYouImageProvider === 'meta-muse' ? 'meta-muse' : 'gemini',
+        metaImageApiKey: settings.metaImageApiKey || '',
       } as SettingsState;
     }
   } catch (err) {
@@ -301,6 +302,8 @@ export function loadSettings(): SettingsState {
     apiKey: seedKey,
     textApiKey: '',
     textModel: DEFAULT_GEMINI_TEXT_MODEL,
+    thankYouImageProvider: 'gemini',
+    metaImageApiKey: '',
     verification: {
       status: 'unchecked',
       message: 'Not checked yet.',

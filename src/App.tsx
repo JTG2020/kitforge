@@ -76,7 +76,7 @@ export const App: React.FC = () => {
         {!hasImageApiKey && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
             <span>
-              ⚠️ <strong>No image-generation key set.</strong> Add your billing-enabled image key in Settings. Text features use a separate free-tier key.
+              ⚠️ <strong>No Gemini image-generation key set.</strong> Add it in Settings for Look and Pieces. Thank You can use Gemini or Meta Muse. Text features use a separate key.
             </span>
             <button
               type="button"
@@ -189,6 +189,8 @@ export const App: React.FC = () => {
           {activeTab === 'thank-you-letter' && (
             <ThankYouLetterStep
               imageApiKey={settings.apiKey}
+              imageProvider={settings.thankYouImageProvider}
+              metaImageApiKey={settings.metaImageApiKey}
               textApiKey={settings.textApiKey}
               textModel={settings.textModel}
               project={currentProject}

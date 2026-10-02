@@ -68,9 +68,13 @@ export interface KeyVerification {
   imageModelAvailable?: boolean;
 }
 
+export type ThankYouImageProvider = 'gemini' | 'meta-muse';
+
 export interface SettingsState {
   apiKey: string;
   textApiKey: string;
   textModel: GeminiTextModel;
+  thankYouImageProvider: ThankYouImageProvider;
+  metaImageApiKey: string;
   verification: KeyVerification;
 }

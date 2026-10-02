@@ -9,8 +9,8 @@ npm test
 ```
 
 The command runs Node's built-in test runner against `src/test/*.test.mjs`.
-The suite currently contains 17 automated tests. All should pass; the Gemini
-Interactions contract test uses a mocked `fetch` and does not call Google's API.
+The suite currently contains 25 automated tests. All should pass; provider
+contract tests use mocked `fetch` and do not call live APIs.
 
 ## Test inventory
 
@@ -79,9 +79,35 @@ Interactions contract test uses a mocked `fetch` and does not call Google's API.
 17. **Model ID in surfaced errors** — prefixes text and image errors with the
    model ID and avoids duplicate prefixes.
 
+### Thank You image providers — `src/test/metaMuse.test.mjs`
+
+18. **Muse prompt-only generation** — verifies the Images API endpoint, model,
+   bearer auth, base64 response, and PNG data URL normalization.
+19. **Muse reference and edit requests** — verifies reference images and
+   prompt-guided edits use the edit endpoint.
+20. **Muse API error handling** — reports provider errors and missing image
+   data.
+21. **Muse input validation** — rejects missing keys, blank instructions, and
+   non-image edit sources.
+
+### Thank You image settings — `src/test/imageSettings.test.mjs`
+
+22. **Legacy settings defaults** — old saved settings default the Thank You
+   image provider to Gemini and leave the Meta key empty.
+23. **Independent provider credentials** — saves and restores the Thank You
+   provider and Meta key independently from Gemini image and text keys.
+
+### Thank You image routing — `src/test/thankYouImage.test.mjs`
+
+24. **Thank You provider dispatch** — sends Muse requests through the Meta
+   endpoint and invokes the existing Gemini generator only when Gemini is
+   selected.
+25. **Thank You prompt-guided editing** — sends the selected image and edit
+   instruction, preserves the text-safe center, and sets the page aspect ratio.
+
 ## Coverage limits
 
-These tests cover deterministic utility behavior and the SDK request contract.
-They do not make live Gemini calls or replace browser-level checks of the
-Thank You Letter workflow, approval gates, reference-image handling, canvas
+These tests cover deterministic utility behavior and mocked provider request
+contracts. They do not make live API calls or replace browser-level checks of
+the Thank You Letter workflow, approval gates, reference-image handling, canvas
 rendering, or PDF download.

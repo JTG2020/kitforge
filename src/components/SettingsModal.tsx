@@ -20,8 +20,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [apiKeyInput, setApiKeyInput] = useState(settings.apiKey);
   const [textApiKeyInput, setTextApiKeyInput] = useState(settings.textApiKey);
+  const [metaImageApiKeyInput, setMetaImageApiKeyInput] = useState(settings.metaImageApiKey);
   const [showKey, setShowKey] = useState(false);
   const [showTextKey, setShowTextKey] = useState(false);
+  const [showMetaImageKey, setShowMetaImageKey] = useState(false);
   const [isCheckingStage1, setIsCheckingStage1] = useState(false);
   const [isCheckingStage2, setIsCheckingStage2] = useState(false);
   const [isCheckingTextKey, setIsCheckingTextKey] = useState(false);
@@ -36,6 +38,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
     setTextApiKeyInput(settings.textApiKey);
   }, [settings.textApiKey]);
+
+  useEffect(() => {
+    setMetaImageApiKeyInput(settings.metaImageApiKey);
+  }, [settings.metaImageApiKey]);
 
   // Stage 1 Auto-validation on key change debounced ~600ms
   const handleKeyChange = (newKey: string) => {
@@ -174,7 +180,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       <div className="w-full max-w-lg rounded-xl border border-line bg-panel shadow-sm">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
-          <h2 className="text-sm font-semibold text-ink">Gemini API Settings</h2>
+          <h2 className="text-sm font-semibold text-ink">AI API Settings</h2>
           <button
             type="button"
             onClick={onClose}
@@ -190,10 +196,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <p className="font-medium text-ink">Direct REST Endpoint & Key Isolation</p>
             <p>
               Calls are made directly via client-side <code className="font-mono bg-panel px-1 py-0.5 rounded text-ink">fetch</code> with <code className="font-mono bg-panel px-1 py-0.5 rounded text-ink">credentials: "omit"</code>.
-              The image key is used only for image generation; the separate text key is used only for text models. Both stay in your browser and are never sent to a proxy.
+              Keys stay in your browser and are sent directly to their provider. Text-model selection and credentials are separate from image providers.
             </p>
             <p className="text-amber-800 font-medium pt-1">
-              Use different keys for image generation and text models. Only the image key should come from a billing-enabled project.
+              Keep text and image provider keys separate. Gemini and Meta image generation may incur charges from their respective accounts.
             </p>
           </div>
 
@@ -254,8 +260,55 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
+            <label htmlFor="thank-you-image-provider" className="block text-xs font-semibold uppercase tracking-wide text-ink/70">
+              Thank You page image provider
+            </label>
+            <select
+              id="thank-you-image-provider"
+              value={settings.thankYouImageProvider}
+              onChange={(event) => onUpdateSettings({ thankYouImageProvider: event.target.value as SettingsState['thankYouImageProvider'] })}
+              className="w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink focus:border-brand focus:outline-none"
+            >
+              <option value="gemini">Gemini</option>
+              <option value="meta-muse">Meta Muse Image</option>
+            </select>
+            <p className="text-[11px] text-ink/60">This choice applies only to Thank You Letter backgrounds and Muse edits. Look and Pieces continue using Gemini.</p>
+          </div>
+
+          {settings.thankYouImageProvider === 'meta-muse' && (
+            <div className="space-y-1.5">
+              <label htmlFor="meta-image-api-key" className="block text-xs font-semibold uppercase tracking-wide text-ink/70">
+                Meta Muse API key
+              </label>
+              <div className="relative flex items-center">
+                <input
+                  id="meta-image-api-key"
+                  type={showMetaImageKey ? 'text' : 'password'}
+                  value={metaImageApiKeyInput}
+                  onChange={(event) => {
+                    setMetaImageApiKeyInput(event.target.value);
+                    onUpdateSettings({ metaImageApiKey: event.target.value });
+                  }}
+                  placeholder="Meta Model API key"
+                  className="w-full rounded-lg border border-line bg-panel px-3 py-2 pr-16 text-sm text-ink focus:border-brand focus:outline-none font-mono"
+                  autoComplete="off"
+                  spellCheck="false"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowMetaImageKey(!showMetaImageKey)}
+                  className="absolute right-2.5 px-1 py-0.5 text-xs font-medium text-ink/50 hover:text-ink"
+                >
+                  {showMetaImageKey ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              <p className="text-[11px] text-ink/60">Used only for Thank You page image generation and prompt-guided edits.</p>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
             <label htmlFor="gemini-image-api-key" className="block text-xs font-semibold uppercase tracking-wide text-ink/70">
-              Image-generation API key (billing-enabled project)
+              Gemini image API key (Look, Pieces, and Thank You with Gemini)
             </label>
             <div className="relative flex items-center">
               <input
@@ -293,10 +346,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             />
             <div className="space-y-1 min-w-0 flex-1">
               <div className="font-medium text-ink">
-                {currentStatus === 'valid' && 'Key Valid & Ready'}
-                {currentStatus === 'amber' && 'Key Valid (Image Model Unavailable)'}
-                {currentStatus === 'invalid' && 'Key Invalid or Billing Required'}
-                {currentStatus === 'unchecked' && 'Key Not Verified'}
+                {currentStatus === 'valid' && 'Gemini image key valid & ready'}
+                {currentStatus === 'amber' && 'Gemini key valid (image model unavailable)'}
+                {currentStatus === 'invalid' && 'Gemini key invalid or billing required'}
+                {currentStatus === 'unchecked' && 'Gemini image key not verified'}
               </div>
               <p className="text-ink/70 break-words">{settings.verification.message}</p>
               {settings.verification.activationUrl && (
@@ -320,7 +373,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               disabled={isCheckingStage1 || !apiKeyInput.trim()}
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-medium text-ink hover:bg-shell transition disabled:opacity-45"
             >
-              {isCheckingStage1 ? 'Checking image model...' : 'Check image model access'}
+              {isCheckingStage1 ? 'Checking Gemini image model...' : 'Check Gemini image access'}
             </button>
 
             <button
@@ -329,7 +382,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               disabled={isCheckingStage2 || !apiKeyInput.trim()}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 transition disabled:opacity-45"
             >
-              {isCheckingStage2 ? 'Generating test...' : 'Test key (generates one small image, about ₹6)'}
+              {isCheckingStage2 ? 'Generating Gemini test...' : 'Test Gemini key (one small image, about ₹6)'}
             </button>
           </div>
         </div>
