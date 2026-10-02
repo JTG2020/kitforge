@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { BrandKit, FaceState, ArtworkVariation } from '../types/product';
-import { ProjectState, SettingsState, StyleBoard } from '../types/project';
+import {
+  DEFAULT_THANK_YOU_LETTER_INTAKE,
+  ProjectState,
+  SettingsState,
+  StyleBoard,
+  ThankYouLetterIntake,
+} from '../types/project';
 import { DEFAULT_PRODUCT_SPECS } from '../config/products';
 import { getDefaultPalette } from '../services/palette';
 import { loadProjects, loadSettings, persistProject, saveSettings } from '../services/storage';
@@ -48,6 +54,7 @@ export function createInitialProject(name = 'Welcome Kit 2026'): ProjectState {
     brandKit: createDefaultBrandKit(),
     styleBoards: [],
     faceStates: createDefaultFaceStates(),
+    thankYouLetterIntake: { ...DEFAULT_THANK_YOU_LETTER_INTAKE },
     estimatedCostRupees: 0,
   };
 }
@@ -294,6 +301,25 @@ export function useKitForgeStore() {
     });
   }, [activeProjectId]);
 
+  const updateThankYouLetterIntake = useCallback((updates: Partial<ThankYouLetterIntake>) => {
+    setProjects((prev) => {
+      const p = prev[activeProjectId];
+      if (!p) return prev;
+      return {
+        ...prev,
+        [activeProjectId]: {
+          ...p,
+          updatedAt: Date.now(),
+          thankYouLetterIntake: {
+            ...DEFAULT_THANK_YOU_LETTER_INTAKE,
+            ...p.thankYouLetterIntake,
+            ...updates,
+          },
+        },
+      };
+    });
+  }, [activeProjectId]);
+
   const updateElementRect = useCallback(
     (faceId: string, elementId: string, rect: import('../types/geometry').RectMM) => {
       setProjects((prev) => {
@@ -398,6 +424,7 @@ export function useKitForgeStore() {
     setFaceSelectedId,
     setFaceFinalData,
     updateCopyValue,
+    updateThankYouLetterIntake,
     updateElementRect,
     resetCustomLayout,
     recordCostRupees,

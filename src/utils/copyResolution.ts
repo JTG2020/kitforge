@@ -9,8 +9,8 @@ export function resolveCopyFieldValue(
   copyIndex: number,
   copyValues?: Record<string, string>
 ): string {
-  if (copyValues && copyValues[field.id] !== undefined && copyValues[field.id].trim() !== '') {
-    return copyValues[field.id];
+  if (copyValues && Object.prototype.hasOwnProperty.call(copyValues, field.id)) {
+    return copyValues[field.id] || '';
   }
 
   if (field.copyPlaceholders && field.copyPlaceholders[copyIndex] !== undefined) {

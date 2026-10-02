@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SettingsState, KeyStatus } from '../types/project';
-import { validateApiKeyStage1, validateApiKeyStage2 } from '../services/gemini';
+import { generateGeminiTextCall, validateApiKeyStage1, validateApiKeyStage2 } from '../services/gemini';
+import { FREE_GEMINI_TEXT_MODELS } from '../config/textModels';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -18,9 +19,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onRecordCost,
 }) => {
   const [apiKeyInput, setApiKeyInput] = useState(settings.apiKey);
+  const [textApiKeyInput, setTextApiKeyInput] = useState(settings.textApiKey);
   const [showKey, setShowKey] = useState(false);
+  const [showTextKey, setShowTextKey] = useState(false);
   const [isCheckingStage1, setIsCheckingStage1] = useState(false);
   const [isCheckingStage2, setIsCheckingStage2] = useState(false);
+  const [isCheckingTextKey, setIsCheckingTextKey] = useState(false);
+  const [textKeyMessage, setTextKeyMessage] = useState('');
 
   const debounceTimer = useRef<any>(null);
 
@@ -28,14 +33,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setApiKeyInput(settings.apiKey);
   }, [settings.apiKey]);
 
+  useEffect(() => {
+    setTextApiKeyInput(settings.textApiKey);
+  }, [settings.textApiKey]);
+
   // Stage 1 Auto-validation on key change debounced ~600ms
   const handleKeyChange = (newKey: string) => {
+    const textKeyMatchesImageKey = !!newKey.trim() && newKey.trim() === textApiKeyInput.trim();
     setApiKeyInput(newKey);
+    if (textKeyMatchesImageKey) {
+      setTextApiKeyInput('');
+      setTextKeyMessage('Use separate API keys for image generation and text models.');
+    }
     onUpdateSettings({
       apiKey: newKey,
+      ...(textKeyMatchesImageKey ? { textApiKey: '' } : {}),
       verification: {
         status: newKey.trim() ? 'unchecked' : 'invalid',
-        message: newKey.trim() ? 'Key changed. Testing validity...' : 'No API key set. Add your Gemini key in Settings.',
+        message: newKey.trim() ? 'Key changed. Testing image-model access...' : 'No image-generation key set. Add one in Settings.',
       },
     });
 
@@ -69,6 +84,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         },
       });
     }, 600);
+  };
+
+  const handleTextKeyChange = (newKey: string) => {
+    if (newKey.trim() && newKey.trim() === apiKeyInput.trim()) {
+      setTextApiKeyInput('');
+      setTextKeyMessage('Use separate API keys for image generation and text models.');
+      onUpdateSettings({ textApiKey: '' });
+      return;
+    }
+    setTextApiKeyInput(newKey);
+    setTextKeyMessage('');
+    onUpdateSettings({ textApiKey: newKey });
+  };
+
+  const handleRunTextKeyCheck = async () => {
+    if (!textApiKeyInput.trim() || textApiKeyInput.trim() === apiKeyInput.trim()) {
+      setTextKeyMessage('Enter a text API key that is different from the image-generation key.');
+      return;
+    }
+    setIsCheckingTextKey(true);
+    setTextKeyMessage('');
+    try {
+      await generateGeminiTextCall(textApiKeyInput, 'Reply with only OK.', undefined, settings.textModel);
+      setTextKeyMessage(`Text request succeeded with ${settings.textModel}.`);
+    } catch (error) {
+      setTextKeyMessage(error instanceof Error ? error.message : 'Text model request failed.');
+    } finally {
+      setIsCheckingTextKey(false);
+    }
   };
 
   const handleRunStage1 = async () => {
@@ -146,19 +190,76 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <p className="font-medium text-ink">Direct REST Endpoint & Key Isolation</p>
             <p>
               Calls are made directly via client-side <code className="font-mono bg-panel px-1 py-0.5 rounded text-ink">fetch</code> with <code className="font-mono bg-panel px-1 py-0.5 rounded text-ink">credentials: "omit"</code>.
-              Your key stays strictly in your browser and is never logged or sent to any proxy.
+              The image key is used only for image generation; the separate text key is used only for text models. Both stay in your browser and are never sent to a proxy.
             </p>
             <p className="text-amber-800 font-medium pt-1">
-              Image generation needs a billing-enabled key. A free-tier key will not work.
+              Use different keys for image generation and text models. Only the image key should come from a billing-enabled project.
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-ink/70">
-              Gemini API Key
+            <label htmlFor="gemini-text-model" className="block text-xs font-semibold uppercase tracking-wide text-ink/70">
+              Free-tier text model
+            </label>
+            <select
+              id="gemini-text-model"
+              value={settings.textModel}
+              onChange={(event) => onUpdateSettings({ textModel: event.target.value as SettingsState['textModel'] })}
+              className="w-full rounded-lg border border-line bg-panel px-3 py-2 text-sm text-ink focus:border-brand focus:outline-none"
+            >
+              {FREE_GEMINI_TEXT_MODELS.map((model) => (
+                <option key={model.id} value={model.id}>{model.label}</option>
+              ))}
+            </select>
+            <p className="text-[11px] text-ink/60">
+              Free-tier quotas apply, and Google may use submitted content to improve its products. Gemini 2.5 options may be unavailable to new API projects.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="gemini-text-api-key" className="block text-xs font-semibold uppercase tracking-wide text-ink/70">
+              Text-model API key (free-tier project)
             </label>
             <div className="relative flex items-center">
               <input
+                id="gemini-text-api-key"
+                type={showTextKey ? 'text' : 'password'}
+                value={textApiKeyInput}
+                onChange={(event) => handleTextKeyChange(event.target.value)}
+                placeholder="Separate key for free text requests"
+                className="w-full rounded-lg border border-line bg-panel px-3 py-2 pr-16 text-sm text-ink focus:border-brand focus:outline-none font-mono"
+                autoComplete="off"
+                spellCheck="false"
+              />
+              <button
+                type="button"
+                onClick={() => setShowTextKey(!showTextKey)}
+                className="absolute right-2.5 text-xs text-ink/50 hover:text-ink font-medium px-1 py-0.5"
+              >
+                {showTextKey ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRunTextKeyCheck}
+                disabled={isCheckingTextKey || !textApiKeyInput.trim()}
+                className="rounded border border-line bg-panel px-3 py-1.5 text-xs font-medium text-ink hover:bg-shell disabled:opacity-45"
+              >
+                {isCheckingTextKey ? 'Testing text key...' : 'Test text key'}
+              </button>
+              <span className="text-[11px] text-ink/60">Sends one short request using the selected free-tier model.</span>
+            </div>
+            {textKeyMessage && <p role="status" className="text-xs text-ink/70">{textKeyMessage}</p>}
+          </div>
+
+          <div className="space-y-1.5">
+            <label htmlFor="gemini-image-api-key" className="block text-xs font-semibold uppercase tracking-wide text-ink/70">
+              Image-generation API key (billing-enabled project)
+            </label>
+            <div className="relative flex items-center">
+              <input
+                id="gemini-image-api-key"
                 type={showKey ? 'text' : 'password'}
                 value={apiKeyInput}
                 onChange={(e) => handleKeyChange(e.target.value)}
@@ -219,7 +320,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               disabled={isCheckingStage1 || !apiKeyInput.trim()}
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-medium text-ink hover:bg-shell transition disabled:opacity-45"
             >
-              {isCheckingStage1 ? 'Checking models...' : 'Test key (Free model list)'}
+              {isCheckingStage1 ? 'Checking image model...' : 'Check image model access'}
             </button>
 
             <button

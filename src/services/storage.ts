@@ -1,5 +1,6 @@
 import { ProjectState } from '../types/project';
 import { SettingsState } from '../types/project';
+import { DEFAULT_GEMINI_TEXT_MODEL, resolveGeminiTextModel } from '../config/textModels';
 
 const DB_NAME = 'kitforge_pixels_v1';
 const STORE_NAME = 'images';
@@ -107,6 +108,15 @@ export async function persistProject(project: ProjectState): Promise<void> {
     });
   }
 
+  const letterReference = project.thankYouLetterIntake?.referenceImageDataUrl;
+  if (letterReference?.startsWith('data:')) {
+    const referenceId = `thank_you_reference_${project.id}`;
+    imagesToSave.push({ id: referenceId, dataUrl: letterReference });
+    if (projectClean.thankYouLetterIntake) {
+      projectClean.thankYouLetterIntake.referenceImageDataUrl = referenceId;
+    }
+  }
+
   // Style Boards
   if (project.styleBoards) {
     for (const sb of project.styleBoards) {
@@ -197,6 +207,11 @@ export async function loadProjects(): Promise<{
         p.brandKit.references = hydRefs;
       }
 
+      const letterReference = p.thankYouLetterIntake?.referenceImageDataUrl;
+      if (letterReference && !letterReference.startsWith('data:')) {
+        p.thankYouLetterIntake!.referenceImageDataUrl = await getImageData(letterReference) || undefined;
+      }
+
       // Hydrate Style Boards
       if (p.styleBoards) {
         const validBoards = [];
@@ -265,7 +280,12 @@ export function loadSettings(): SettingsState {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) {
-      return JSON.parse(raw);
+      const settings = JSON.parse(raw) as Partial<SettingsState>;
+      return {
+        ...settings,
+        textApiKey: settings.textApiKey || '',
+        textModel: resolveGeminiTextModel(settings.textModel),
+      } as SettingsState;
     }
   } catch (err) {
     console.error('Failed to read settings from localStorage', err);
@@ -279,6 +299,8 @@ export function loadSettings(): SettingsState {
 
   return {
     apiKey: seedKey,
+    textApiKey: '',
+    textModel: DEFAULT_GEMINI_TEXT_MODEL,
     verification: {
       status: 'unchecked',
       message: 'Not checked yet.',

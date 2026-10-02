@@ -8,7 +8,7 @@ interface BrandStepProps {
   onProceedToLook: () => void;
 }
 
-const FONT_OPTIONS = [
+export const FONT_OPTIONS = [
   {
     name: 'Classic Editorial Serif',
     heading: 'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
@@ -23,6 +23,11 @@ const FONT_OPTIONS = [
     name: 'Literary & Academic',
     heading: 'ui-serif, "Palatino Linotype", "Book Antiqua", Palatino, serif',
     body: 'ui-serif, Georgia, serif',
+  },
+  {
+    name: 'Script / Display',
+    heading: 'Dancing Script',
+    body: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
 ];
 
@@ -230,7 +235,7 @@ export const BrandStep: React.FC<BrandStepProps> = ({
                 Typography Stack
               </label>
               <div className="space-y-2">
-                {FONT_OPTIONS.map((f, idx) => (
+                {FONT_OPTIONS.filter((font) => font.name !== 'Script / Display').map((f, idx) => (
                   <label
                     key={idx}
                     className={`flex items-center justify-between rounded-lg border p-2.5 cursor-pointer transition ${

@@ -28,7 +28,9 @@ export const PreExportModal: React.FC<PreExportModalProps> = ({
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <div>
             <h2 className="text-sm font-semibold text-ink">Pre-Export Quality & Print Audit</h2>
-            <p className="text-xs text-ink/60">Verifying 15 printed pages across 9 physical pieces</p>
+            <p className="text-xs text-ink/60">
+              Verifying {report.totalPages} printed {report.totalPages === 1 ? 'page' : 'pages'}
+            </p>
           </div>
           <button
             type="button"
@@ -44,7 +46,9 @@ export const PreExportModal: React.FC<PreExportModalProps> = ({
           {/* Summary Status */}
           <div className="flex items-center gap-3 rounded-lg border border-line bg-shell p-3">
             <div className="text-ink font-medium">
-              Export summary: <span className="font-semibold text-brand">{report.totalPages} total pages</span>
+              Export summary: <span className="font-semibold text-brand">
+                {report.totalPages} total {report.totalPages === 1 ? 'page' : 'pages'}
+              </span>
             </div>
             <div className="text-ink/60">
               {hasOverflows ? (
@@ -110,7 +114,7 @@ export const PreExportModal: React.FC<PreExportModalProps> = ({
             </div>
           ) : (
             <div className="rounded-lg border border-teal-200 bg-teal-50/40 p-3 text-teal-900">
-              ✓ Every single text line across all 15 printed copies fits comfortably within printable margins.
+              ✓ Every text line in this export fits comfortably within printable margins.
             </div>
           )}
         </div>
@@ -130,7 +134,9 @@ export const PreExportModal: React.FC<PreExportModalProps> = ({
             disabled={isExporting}
             className="rounded-lg bg-brand px-4 py-2 text-xs font-medium text-white hover:opacity-90 transition disabled:opacity-45"
           >
-            {isExporting ? 'Generating 15-Page PDF...' : 'Download Print-Ready PDF (15 Pages)'}
+            {isExporting
+              ? 'Generating PDF...'
+              : `Download Print-Ready PDF (${report.totalPages} ${report.totalPages === 1 ? 'Page' : 'Pages'})`}
           </button>
         </div>
       </div>

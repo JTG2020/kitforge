@@ -4,6 +4,7 @@ import { DEFAULT_PRODUCT_SPECS } from '../../config/products';
 import { exportKitPdf, generatePreExportReport, PreExportReport } from '../../services/pdf';
 import { PreExportModal } from '../PreExportModal';
 import { CanvasPreview } from '../preview/CanvasPreview';
+import { FONT_OPTIONS } from './BrandStep';
 
 interface ExportStepProps {
   project: ProjectState;
@@ -120,6 +121,11 @@ export const ExportStep: React.FC<ExportStepProps> = ({ project }) => {
                         face={face}
                         faceState={faceState}
                         brandKit={project.brandKit}
+                        headingFontOverride={
+                          spec.id === 'spec-thank-you'
+                            ? FONT_OPTIONS.find((preset) => preset.name === project.thankYouLetterIntake?.typography)?.heading
+                            : undefined
+                        }
                         copyIndex={cIdx}
                         showGuides={false}
                       />

@@ -48,4 +48,7 @@ test('resolveCopyFieldValue resolves per-copy placeholders correctly', () => {
   // Custom typed value overrides default placeholder
   const customValues = { 'ref-code': 'CUSTOM-VIP-2026' };
   assert.equal(resolveCopyFieldValue(couponField, 2, customValues), 'CUSTOM-VIP-2026');
+
+  // An explicit blank removes the default copy instead of restoring it.
+  assert.equal(resolveCopyFieldValue(couponField, 2, { 'ref-code': '' }), '');
 });

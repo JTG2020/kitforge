@@ -8,8 +8,9 @@ import { BrandStep } from './components/steps/BrandStep';
 import { LookStep } from './components/steps/LookStep';
 import { PiecesStep } from './components/steps/PiecesStep';
 import { ExportStep } from './components/steps/ExportStep';
+import { ThankYouLetterStep } from './components/steps/ThankYouLetterStep';
 
-type TabId = 'brand' | 'look' | 'pieces' | 'export';
+type TabId = 'brand' | 'look' | 'pieces' | 'thank-you-letter' | 'export';
 
 export const App: React.FC = () => {
   const {
@@ -32,6 +33,7 @@ export const App: React.FC = () => {
     resetCustomLayout,
     recordCostRupees,
     updateSettings,
+    updateThankYouLetterIntake,
   } = useKitForgeStore();
 
   const [activeTab, setActiveTab] = useState<TabId>('brand');
@@ -40,7 +42,7 @@ export const App: React.FC = () => {
   const isLookRunning = useIsTabRunning('look');
   const isPiecesRunning = useIsTabRunning('pieces');
 
-  const hasApiKey = !!settings.apiKey && settings.apiKey.trim().length > 0;
+  const hasImageApiKey = !!settings.apiKey && settings.apiKey.trim().length > 0;
 
   if (!isHydrated) {
     return (
@@ -64,17 +66,17 @@ export const App: React.FC = () => {
           onNewProject={() => createNewProject()}
           onDuplicateProject={duplicateProject}
           onOpenSettings={() => setIsSettingsOpen(true)}
-          hasApiKey={hasApiKey}
+          hasApiKey={hasImageApiKey}
         />
 
         {/* Global Activity Strip for in-flight background jobs */}
         <ActivityStrip />
 
         {/* No API Key Banner */}
-        {!hasApiKey && (
+        {!hasImageApiKey && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
             <span>
-              ⚠️ <strong>No API key set.</strong> Add your Gemini key in Settings. Image generation needs a billing-enabled key. A free-tier key will not work.
+              ⚠️ <strong>No image-generation key set.</strong> Add your billing-enabled image key in Settings. Text features use a separate free-tier key.
             </span>
             <button
               type="button"
@@ -127,6 +129,16 @@ export const App: React.FC = () => {
           >
             Export
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('thank-you-letter')}
+            className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
+              activeTab === 'thank-you-letter' ? 'bg-brand text-white' : 'text-ink/80 hover:bg-shell'
+            }`}
+          >
+            Thank You Letter
+          </button>
         </nav>
 
         {/* Step Content */}
@@ -170,6 +182,22 @@ export const App: React.FC = () => {
               onResetCustomLayout={resetCustomLayout}
               onRecordCost={recordCostRupees}
               onProceedToExport={() => setActiveTab('export')}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+            />
+          )}
+
+          {activeTab === 'thank-you-letter' && (
+            <ThankYouLetterStep
+              imageApiKey={settings.apiKey}
+              textApiKey={settings.textApiKey}
+              textModel={settings.textModel}
+              project={currentProject}
+              onUpdateIntake={updateThankYouLetterIntake}
+              onUpdateCopyValue={updateCopyValue}
+              onAddArtworkVariation={addArtworkVariation}
+              onSetFaceSelectedId={setFaceSelectedId}
+              onUpdateElementRect={updateElementRect}
+              onRecordCost={recordCostRupees}
               onOpenSettings={() => setIsSettingsOpen(true)}
             />
           )}

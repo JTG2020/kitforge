@@ -8,8 +8,11 @@ import {
 import { BrandKit, Face, ProductSpec } from '../types/product';
 import { calculateRegionPercentages, findNearestAspectBucket } from '../utils/geometry';
 import { MASK_PROMPT_INSTRUCTION } from './mask';
+import { DEFAULT_GEMINI_TEXT_MODEL, GeminiTextModel } from '../config/textModels';
+import { formatGeminiModelError, isTemporaryGeminiCapacityError } from '../utils/geminiErrors';
 
 export const GEMINI_IMAGE_MODEL = 'gemini-3-pro-image';
+export const GEMINI_TEXT_MODEL = DEFAULT_GEMINI_TEXT_MODEL;
 
 function extractMimeAndBase64(dataUrl: string): { mimeType: string; data: string } {
   const parts = dataUrl.split(',');
@@ -39,12 +42,23 @@ export function parseApiError(errorObj: any, httpStatus?: number): ParsedApiErro
 
   const lower = rawMsg.toLowerCase();
 
+  if (isTemporaryGeminiCapacityError(rawMsg, httpStatus)) {
+    return {
+      httpStatus,
+      statusString: 'UNAVAILABLE',
+      userMessage: `${GEMINI_IMAGE_MODEL}: Gemini image generation is temporarily unavailable.`,
+      actionableFix: 'Wait a few minutes and try again. This does not indicate an API key or billing problem.',
+      activationUrl,
+      rawMessage: rawMsg,
+    };
+  }
+
   // 1. No key was sent at all
   if (lower.includes('unregistered callers') || lower.includes('api key not provided')) {
     return {
       httpStatus,
       statusString: 'PERMISSION_DENIED',
-      userMessage: 'No API key provided or key failed to reach client.',
+      userMessage: `${GEMINI_IMAGE_MODEL}: No API key provided or key failed to reach client.`,
       actionableFix: 'The field is empty, or the value never reached the client',
       activationUrl,
       rawMessage: rawMsg,
@@ -56,7 +70,7 @@ export function parseApiError(errorObj: any, httpStatus?: number): ParsedApiErro
     return {
       httpStatus,
       statusString: 'INVALID_ARGUMENT',
-      userMessage: 'The API key provided is not valid.',
+      userMessage: `${GEMINI_IMAGE_MODEL}: The API key provided is not valid.`,
       actionableFix: 'Re-copy the key',
       activationUrl,
       rawMessage: rawMsg,
@@ -68,7 +82,7 @@ export function parseApiError(errorObj: any, httpStatus?: number): ParsedApiErro
     return {
       httpStatus: 403,
       statusString: 'PERMISSION_DENIED',
-      userMessage: 'Permission denied from ambient identity or credentials.',
+      userMessage: `${GEMINI_IMAGE_MODEL}: Permission denied from ambient identity or credentials.`,
       actionableFix:
         'An SDK or a cookie supplied an ambient identity; send the key alone, with credentials: "omit"',
       activationUrl,
@@ -85,7 +99,7 @@ export function parseApiError(errorObj: any, httpStatus?: number): ParsedApiErro
     return {
       httpStatus: 403,
       statusString: 'PERMISSION_DENIED',
-      userMessage: 'Generative Language API is disabled on this project.',
+      userMessage: `${GEMINI_IMAGE_MODEL}: Generative Language API is disabled on this project.`,
       actionableFix: 'Enable the API on that project',
       activationUrl:
         activationUrl || 'https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com',
@@ -102,7 +116,7 @@ export function parseApiError(errorObj: any, httpStatus?: number): ParsedApiErro
     return {
       httpStatus: 403,
       statusString: 'PERMISSION_DENIED',
-      userMessage: 'Project has no billing enabled for image generation.',
+      userMessage: `${GEMINI_IMAGE_MODEL}: Project has no billing enabled for image generation.`,
       actionableFix: 'Enable billing — image models have no free tier',
       activationUrl: activationUrl || 'https://aistudio.google.com/api-keys',
       rawMessage: rawMsg,
@@ -114,7 +128,7 @@ export function parseApiError(errorObj: any, httpStatus?: number): ParsedApiErro
     return {
       httpStatus: 403,
       statusString: 'PERMISSION_DENIED',
-      userMessage: 'API Key is restricted by referrer or IP address.',
+      userMessage: `${GEMINI_IMAGE_MODEL}: API Key is restricted by referrer or IP address.`,
       actionableFix: 'Loosen the restriction',
       activationUrl,
       rawMessage: rawMsg,
@@ -126,7 +140,7 @@ export function parseApiError(errorObj: any, httpStatus?: number): ParsedApiErro
     return {
       httpStatus: 429,
       statusString: 'RESOURCE_EXHAUSTED',
-      userMessage: 'Rate limit or resource quota exceeded.',
+      userMessage: `${GEMINI_IMAGE_MODEL}: Rate limit or resource quota exceeded.`,
       actionableFix: 'Wait, or raise the quota',
       activationUrl,
       rawMessage: rawMsg,
@@ -136,7 +150,7 @@ export function parseApiError(errorObj: any, httpStatus?: number): ParsedApiErro
   return {
     httpStatus,
     statusString: statusStr,
-    userMessage: rawMsg || 'An unknown error occurred.',
+    userMessage: `${GEMINI_IMAGE_MODEL}: ${rawMsg || 'An unknown error occurred.'}`,
     actionableFix: 'Check key status and project configuration',
     activationUrl,
     rawMessage: rawMsg,
@@ -158,7 +172,7 @@ export async function validateApiKeyStage1(apiKey: string): Promise<{
     return {
       valid: false,
       imageModelAvailable: false,
-      message: 'No API key set. Add your Gemini key in Settings.',
+      message: `${GEMINI_IMAGE_MODEL}: No API key set. Add your image-generation key in Settings.`,
       actionableFix: 'The field is empty, or the value never reached the client',
     };
   }
@@ -180,7 +194,7 @@ export async function validateApiKeyStage1(apiKey: string): Promise<{
       return {
         valid: false,
         imageModelAvailable: false,
-        message: parsed.userMessage,
+        message: formatGeminiModelError(GEMINI_IMAGE_MODEL, parsed.userMessage),
         actionableFix: parsed.actionableFix,
         activationUrl: parsed.activationUrl,
       };
@@ -218,7 +232,7 @@ export async function validateApiKeyStage1(apiKey: string): Promise<{
     return {
       valid: false,
       imageModelAvailable: false,
-      message: err.message || 'Network error connecting to Gemini endpoint.',
+      message: formatGeminiModelError(GEMINI_IMAGE_MODEL, err.message || 'Network error connecting to Gemini endpoint.'),
       actionableFix: 'Check your network connection and credentials',
     };
   }
@@ -237,7 +251,7 @@ export async function validateApiKeyStage2(apiKey: string): Promise<{
   if (!cleanKey) {
     return {
       success: false,
-      message: 'No API key set. Add your Gemini key in Settings.',
+      message: `${GEMINI_IMAGE_MODEL}: No API key set. Add your image-generation key in Settings.`,
       actionableFix: 'The field is empty, or the value never reached the client',
     };
   }
@@ -276,7 +290,7 @@ export async function validateApiKeyStage2(apiKey: string): Promise<{
       const parsed = parseApiError(data, res.status);
       return {
         success: false,
-        message: parsed.userMessage,
+        message: formatGeminiModelError(GEMINI_IMAGE_MODEL, parsed.userMessage),
         actionableFix: parsed.actionableFix,
         activationUrl: parsed.activationUrl,
       };
@@ -288,7 +302,7 @@ export async function validateApiKeyStage2(apiKey: string): Promise<{
     if (!imgPart?.inlineData?.data) {
       return {
         success: false,
-        message: 'No image data returned from model.',
+        message: `${GEMINI_IMAGE_MODEL}: No image data returned from model.`,
         actionableFix: 'Retry with billing enabled key',
       };
     }
@@ -300,7 +314,7 @@ export async function validateApiKeyStage2(apiKey: string): Promise<{
   } catch (err: any) {
     return {
       success: false,
-      message: err.message || 'Network error during test generation.',
+      message: formatGeminiModelError(GEMINI_IMAGE_MODEL, err.message || 'Network error during test generation.'),
       actionableFix: 'Check connection and project configuration',
     };
   }
@@ -317,7 +331,7 @@ async function callGeminiGenerateContent(
 ): Promise<string> {
   const cleanKey = apiKey.trim();
   if (!cleanKey) {
-    throw new Error('No API key set. Add your Gemini key in Settings.');
+    throw new Error(`${GEMINI_IMAGE_MODEL}: No image-generation API key set.`);
   }
 
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODEL}:generateContent?key=${encodeURIComponent(
@@ -334,32 +348,69 @@ async function callGeminiGenerateContent(
     },
   };
 
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    credentials: 'omit',
-    body: JSON.stringify(payload),
-  });
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'omit',
+      body: JSON.stringify(payload),
+    });
 
-  const data: GeminiGenerateContentResponse = await res.json();
+    const data: GeminiGenerateContentResponse = await res.json();
 
-  if (!res.ok || data.error) {
-    const parsed = parseApiError(data, res.status);
-    const err = new Error(`${parsed.userMessage} (${parsed.actionableFix})`);
-    (err as any).parsed = parsed;
-    throw err;
+    if (!res.ok || data.error) {
+      const parsed = parseApiError(data, res.status);
+      const err = new Error(`${parsed.userMessage} (${parsed.actionableFix})`);
+      (err as any).parsed = parsed;
+      throw err;
+    }
+
+    const candidate = data.candidates?.[0];
+    const inline = candidate?.content?.parts?.find((p) => p.inlineData);
+    if (!inline || !inline.inlineData?.data) {
+      throw new Error('No image was returned in the model candidate parts.');
+    }
+
+    const { mimeType, data: b64 } = inline.inlineData;
+    return `data:${mimeType};base64,${b64}`;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const wrappedError = new Error(formatGeminiModelError(GEMINI_IMAGE_MODEL, message), { cause: error });
+    if ((error as any)?.parsed) (wrappedError as any).parsed = (error as any).parsed;
+    throw wrappedError;
   }
+}
 
-  const candidate = data.candidates?.[0];
-  const inline = candidate?.content?.parts?.find((p) => p.inlineData);
-  if (!inline || !inline.inlineData?.data) {
-    throw new Error('No image was returned in the model candidate parts.');
+export async function generateGeminiTextCall(
+  apiKey: string,
+  prompt: string,
+  responseMimeType?: 'application/json',
+  model: GeminiTextModel = GEMINI_TEXT_MODEL
+): Promise<string> {
+  const cleanKey = apiKey.trim();
+  if (!cleanKey) throw new Error(`${model}: No text-model API key set in Settings.`);
+
+  try {
+    const { GoogleGenAI } = await import('@google/genai');
+    const client = new GoogleGenAI({ apiKey: cleanKey });
+    const interaction = await client.interactions.create({
+      model,
+      input: prompt,
+      store: false,
+      ...(responseMimeType
+        ? { response_format: [{ type: 'text' as const, mime_type: responseMimeType }] }
+        : {}),
+    });
+
+    const text = interaction.output_text?.trim();
+    if (!text) throw new Error('The text model returned an empty response.');
+    return text;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(formatGeminiModelError(model, message), { cause: error });
   }
-
-  const { mimeType, data: b64 } = inline.inlineData;
-  return `data:${mimeType};base64,${b64}`;
 }
 
 /**
@@ -516,6 +567,33 @@ STYLE: ${variantHintText}`;
   parts.push({ text: promptText });
 
   return callGeminiGenerateContent(apiKey, parts, nearestBucket, imageSize);
+}
+
+export async function generateThankYouBackgroundCall(
+  apiKey: string,
+  spec: ProductSpec,
+  brandKit: BrandKit,
+  approvedBrief: string,
+  referenceImages: string[]
+): Promise<string> {
+  const aspectRatio = findNearestAspectBucket(
+    spec.trimW + spec.bleed * 2,
+    spec.trimH + spec.bleed * 2
+  );
+  const parts: GeminiPart[] = [];
+
+  for (const reference of referenceImages.slice(0, 3)) {
+    if (reference.startsWith('data:')) {
+      const { mimeType, data } = extractMimeAndBase64(reference);
+      parts.push({ inlineData: { mimeType, data } });
+    }
+  }
+
+  parts.push({
+    text: `Create a full-bleed photographic or pictorial background for ${spec.name}, a print-ready thank-you letter.\n\nAPPROVED CREATIVE BRIEF: ${approvedBrief}\n\nUse this brand palette naturally: primary ${brandKit.colors.primary}, accent ${brandKit.colors.secondary}, paper ${brandKit.colors.paper}. Brand direction: ${brandKit.styleNote || 'warm, thoughtful, and refined'}.\n\nThe output is background artwork only. Do not render any words, letters, numbers, logo, signature, borders, card mockup, paper edges, or desk. Keep the letter's central copy area calm, light, and low-contrast for editable vector text; allow richer photographic detail toward the edges. Produce a flat, straight-on image that fills the canvas and extends to all edges. If reference images are attached, use them as visual guidance but do not reproduce their text or logos.`,
+  });
+
+  return callGeminiGenerateContent(apiKey, parts, aspectRatio, '2K');
 }
 
 /**

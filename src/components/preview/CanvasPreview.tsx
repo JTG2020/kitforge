@@ -11,6 +11,7 @@ interface CanvasPreviewProps {
   face: Face;
   faceState?: FaceState;
   brandKit: BrandKit;
+  headingFontOverride?: string;
   copyIndex?: number;
   showGuides?: boolean;
   isEditable?: boolean;
@@ -26,6 +27,7 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
   face,
   faceState,
   brandKit,
+  headingFontOverride,
   copyIndex = 0,
   showGuides = true,
   isEditable = true,
@@ -160,7 +162,8 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
 
     // 4. Draw Vector Text Fields
     const copyVals = faceState?.copies?.[copyIndex];
-    const isHeadingSerif = brandKit.fonts.heading.toLowerCase().includes('serif');
+    const isHeadingSerif = (headingFontOverride || brandKit.fonts.heading).toLowerCase().includes('serif');
+    const isHeadingScript = (headingFontOverride || brandKit.fonts.heading) === 'Dancing Script';
     const isBodySerif = brandKit.fonts.body.toLowerCase().includes('serif');
 
     for (const field of face.textFields) {
@@ -178,14 +181,16 @@ export const CanvasPreview: React.FC<CanvasPreviewProps> = ({
 
       const fontFamily =
         field.role === 'heading'
-          ? isHeadingSerif
+          ? isHeadingScript
+            ? '"Dancing Script", cursive'
+            : isHeadingSerif
             ? 'Georgia, serif'
-            : 'ui-sans-serif, system-ui, sans-serif'
+            : headingFontOverride || 'ui-sans-serif, system-ui, sans-serif'
           : isBodySerif
           ? 'Georgia, serif'
           : 'ui-sans-serif, system-ui, sans-serif';
 
-      const fontWeight = field.role === 'heading' ? 'bold' : 'normal';
+      const fontWeight = field.role === 'heading' && !isHeadingScript ? 'bold' : 'normal';
 
       const boxX = (fieldRect.x + spec.bleed) * pxPerMm;
       const boxY = (fieldRect.y + spec.bleed) * pxPerMm;

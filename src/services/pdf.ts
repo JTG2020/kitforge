@@ -22,6 +22,30 @@ export interface PreExportReport {
   totalPages: number;
 }
 
+const SCRIPT_FONT_NAME = 'Dancing Script';
+
+async function loadScriptFontBytes(): Promise<Uint8Array> {
+  const response = await fetch('/fonts/DancingScript.ttf');
+  if (!response.ok) throw new Error('Could not load the Script / Display font for PDF export.');
+  return new Uint8Array(await response.arrayBuffer());
+}
+
+async function registerScriptFont(document: PDFDocument): Promise<void> {
+  const { default: fontkit } = await import('@pdf-lib/fontkit');
+  document.registerFontkit(fontkit);
+}
+
+function getHeadingFontKind(project: ProjectState, spec: ProductSpec): 'script' | 'serif' | 'sans' {
+  if (spec.id === 'spec-thank-you') {
+    const typography = project.thankYouLetterIntake?.typography;
+    if (typography === 'Script / Display') return 'script';
+    if (typography === 'Modern Executive Sans') return 'sans';
+    return 'serif';
+  }
+  if (project.brandKit.fonts.heading === SCRIPT_FONT_NAME) return 'script';
+  return project.brandKit.fonts.heading.toLowerCase().includes('serif') ? 'serif' : 'sans';
+}
+
 function hexToRgb01(hex: string): { r: number; g: number; b: number } {
   const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!match) return { r: 0, g: 0, b: 0 };
@@ -130,10 +154,15 @@ export async function generatePreExportReport(
   const fontSerif = await tempDoc.embedFont(StandardFonts.TimesRoman);
   const fontSerifBold = await tempDoc.embedFont(StandardFonts.TimesRomanBold);
 
-  const isHeadingSerif = project.brandKit.fonts.heading.toLowerCase().includes('serif');
+  const hasScriptHeading = specs.some((spec) => getHeadingFontKind(project, spec) === 'script');
+  if (hasScriptHeading) await registerScriptFont(tempDoc);
+  const scriptFont = hasScriptHeading
+    ? await tempDoc.embedFont(await loadScriptFontBytes(), { subset: true })
+    : undefined;
   const isBodySerif = project.brandKit.fonts.body.toLowerCase().includes('serif');
 
   for (const spec of specs) {
+    const headingFontKind = getHeadingFontKind(project, spec);
     for (let copyIdx = 0; copyIdx < spec.qty; copyIdx++) {
       const copyLabel = spec.copyLabels?.[copyIdx] || `Copy ${copyIdx + 1}`;
 
@@ -168,7 +197,9 @@ export async function generatePreExportReport(
 
           const font =
             field.role === 'heading'
-              ? isHeadingSerif
+              ? headingFontKind === 'script'
+                ? scriptFont!
+                : headingFontKind === 'serif'
                 ? fontSerifBold
                 : fontBold
               : isBodySerif
@@ -223,10 +254,13 @@ export async function exportKitPdf(
   const fontTimes = await pdfDoc.embedFont(StandardFonts.TimesRoman);
   const fontTimesBold = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
 
-  const isHeadingSerif = project.brandKit.fonts.heading.toLowerCase().includes('serif');
+  const hasScriptHeading = specs.some((spec) => getHeadingFontKind(project, spec) === 'script');
+  if (hasScriptHeading) await registerScriptFont(pdfDoc);
+  const scriptFont = hasScriptHeading
+    ? await pdfDoc.embedFont(await loadScriptFontBytes(), { subset: true })
+    : undefined;
   const isBodySerif = project.brandKit.fonts.body.toLowerCase().includes('serif');
 
-  const headingFont = isHeadingSerif ? fontTimesBold : fontHelvBold;
   const bodyFont = isBodySerif ? fontTimes : fontHelv;
 
   const colorInk = hexToRgb01(project.brandKit.colors.ink || '#16181d');
@@ -252,6 +286,13 @@ export async function exportKitPdf(
 
   // Iterate all products and copies (Total 15 pages)
   for (const spec of specs) {
+    const headingFontKind = getHeadingFontKind(project, spec);
+    const headingFont =
+      headingFontKind === 'script'
+        ? scriptFont!
+        : headingFontKind === 'serif'
+        ? fontTimesBold
+        : fontHelvBold;
     const bleedWmm = spec.trimW + spec.bleed * 2;
     const bleedHmm = spec.trimH + spec.bleed * 2;
     const bleedWpt = mmToPt(bleedWmm);
