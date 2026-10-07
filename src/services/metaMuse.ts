@@ -1,10 +1,50 @@
 export const META_MUSE_IMAGE_MODEL = 'muse-image-1.0';
 
 const META_IMAGE_API_BASE = 'https://api.meta.ai/v1/images';
+const META_MODELS_API = 'https://api.meta.ai/v1/models';
 
 interface MetaMuseImageResponse {
   data?: Array<{ b64_json?: string }>;
   error?: { message?: string };
+}
+
+interface MetaMuseModelsResponse {
+  data?: Array<{ id?: string }>;
+  error?: { message?: string };
+}
+
+export async function validateMetaMuseApiKey(apiKey: string): Promise<string> {
+  const cleanKey = apiKey.trim();
+  if (!cleanKey) throw new Error('Enter a Meta API key first.');
+
+  let response: Response;
+  try {
+    response = await fetch(META_MODELS_API, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${cleanKey}` },
+      credentials: 'omit',
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Network request failed.';
+    throw new Error(`Could not reach Meta Model API: ${message}`, { cause: error });
+  }
+
+  let result: MetaMuseModelsResponse;
+  try {
+    result = await response.json() as MetaMuseModelsResponse;
+  } catch {
+    throw new Error(`Meta Model API returned an unreadable response (HTTP ${response.status}).`);
+  }
+
+  if (!response.ok || result.error) {
+    throw new Error(result.error?.message || `Meta API key check failed (HTTP ${response.status}).`);
+  }
+
+  if (!result.data?.some((model) => model.id === META_MUSE_IMAGE_MODEL)) {
+    throw new Error(`The key is valid, but ${META_MUSE_IMAGE_MODEL} is not available to this account.`);
+  }
+
+  return `Meta API key is valid and ${META_MUSE_IMAGE_MODEL} is available.`;
 }
 
 async function callMetaMuseImage(

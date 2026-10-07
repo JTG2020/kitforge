@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { SettingsState, KeyStatus } from '../types/project';
 import { generateGeminiTextCall, validateApiKeyStage1, validateApiKeyStage2 } from '../services/gemini';
+import { validateMetaMuseApiKey } from '../services/metaMuse';
 import { FREE_GEMINI_TEXT_MODELS } from '../config/textModels';
 
 interface SettingsModalProps {
@@ -27,7 +28,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isCheckingStage1, setIsCheckingStage1] = useState(false);
   const [isCheckingStage2, setIsCheckingStage2] = useState(false);
   const [isCheckingTextKey, setIsCheckingTextKey] = useState(false);
+  const [isCheckingMetaKey, setIsCheckingMetaKey] = useState(false);
   const [textKeyMessage, setTextKeyMessage] = useState('');
+  const [metaKeyMessage, setMetaKeyMessage] = useState('');
 
   const debounceTimer = useRef<any>(null);
 
@@ -118,6 +121,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setTextKeyMessage(error instanceof Error ? error.message : 'Text model request failed.');
     } finally {
       setIsCheckingTextKey(false);
+    }
+  };
+
+  const handleRunMetaKeyCheck = async () => {
+    if (!metaImageApiKeyInput.trim()) {
+      setMetaKeyMessage('Enter a Meta API key first.');
+      return;
+    }
+    setIsCheckingMetaKey(true);
+    setMetaKeyMessage('');
+    try {
+      setMetaKeyMessage(await validateMetaMuseApiKey(metaImageApiKeyInput));
+    } catch (error) {
+      setMetaKeyMessage(error instanceof Error ? error.message : 'Meta API key check failed.');
+    } finally {
+      setIsCheckingMetaKey(false);
     }
   };
 
@@ -287,6 +306,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   value={metaImageApiKeyInput}
                   onChange={(event) => {
                     setMetaImageApiKeyInput(event.target.value);
+                    setMetaKeyMessage('');
                     onUpdateSettings({ metaImageApiKey: event.target.value });
                   }}
                   placeholder="Meta Model API key"
@@ -302,6 +322,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   {showMetaImageKey ? 'Hide' : 'Show'}
                 </button>
               </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRunMetaKeyCheck}
+                  disabled={isCheckingMetaKey || !metaImageApiKeyInput.trim()}
+                  className="rounded border border-line bg-panel px-3 py-1.5 text-xs font-medium text-ink hover:bg-shell disabled:opacity-45"
+                >
+                  {isCheckingMetaKey ? 'Checking Meta key...' : 'Test Meta Muse key'}
+                </button>
+                <span className="text-[11px] text-ink/60">Checks account access without generating an image.</span>
+              </div>
+              {metaKeyMessage && (
+                <p role="status" className={`text-xs ${metaKeyMessage.startsWith('Meta API key is valid') ? 'text-teal-700' : 'text-red-700'}`}>
+                  {metaKeyMessage}
+                </p>
+              )}
               <p className="text-[11px] text-ink/60">Used only for Thank You page image generation and prompt-guided edits.</p>
             </div>
           )}

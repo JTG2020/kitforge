@@ -9,7 +9,7 @@ npm test
 ```
 
 The command runs Node's built-in test runner against `src/test/*.test.mjs`.
-The suite currently contains 25 automated tests. All should pass; provider
+The suite currently contains 27 automated tests. All should pass; provider
 contract tests use mocked `fetch` and do not call live APIs.
 
 ## Test inventory
@@ -89,20 +89,24 @@ contract tests use mocked `fetch` and do not call live APIs.
    data.
 21. **Muse input validation** — rejects missing keys, blank instructions, and
    non-image edit sources.
+22. **Meta key validation request** — checks `GET /v1/models` with bearer auth
+   and confirms validation does not generate an image.
+23. **Meta key validation errors** — reports invalid credentials and accounts
+   where Muse Image is unavailable.
 
 ### Thank You image settings — `src/test/imageSettings.test.mjs`
 
-22. **Legacy settings defaults** — old saved settings default the Thank You
+24. **Legacy settings defaults** — old saved settings default the Thank You
    image provider to Gemini and leave the Meta key empty.
-23. **Independent provider credentials** — saves and restores the Thank You
+25. **Independent provider credentials** — saves and restores the Thank You
    provider and Meta key independently from Gemini image and text keys.
 
 ### Thank You image routing — `src/test/thankYouImage.test.mjs`
 
-24. **Thank You provider dispatch** — sends Muse requests through the Meta
+26. **Thank You provider dispatch** — sends Muse requests through the Meta
    endpoint and invokes the existing Gemini generator only when Gemini is
    selected.
-25. **Thank You prompt-guided editing** — sends the selected image and edit
+27. **Thank You prompt-guided editing** — sends the selected image and edit
    instruction, preserves the text-safe center, and sets the page aspect ratio.
 
 ## Coverage limits

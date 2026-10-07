@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { editMetaMuseImage, generateMetaMuseImage } from '../services/metaMuse.ts';
+import {
+  editMetaMuseImage,
+  generateMetaMuseImage,
+  validateMetaMuseApiKey,
+} from '../services/metaMuse.ts';
 
 function mockImageResponse(b64 = 'aW1hZ2U=') {
   return new Response(JSON.stringify({ data: [{ b64_json: b64 }] }), {
@@ -82,4 +86,44 @@ test('Muse rejects missing credentials, blank instructions, and non-image edit s
   await assert.rejects(generateMetaMuseImage('', 'A background'), /No Meta API key/);
   await assert.rejects(generateMetaMuseImage('meta-test-key', '  '), /Add an instruction/);
   assert.throws(() => editMetaMuseImage('meta-test-key', 'not-an-image', 'Change the background'), /not a supported image/);
+});
+
+test('Meta key validation checks Muse availability without generating an image', async () => {
+  const originalFetch = globalThis.fetch;
+  let requestUrl;
+  let requestOptions;
+
+  globalThis.fetch = async (input, init) => {
+    requestUrl = new URL(input);
+    requestOptions = init;
+    return new Response(JSON.stringify({ data: [{ id: 'muse-image-1.0' }, { id: 'muse-spark-1.3' }] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  try {
+    const message = await validateMetaMuseApiKey(' meta-test-key ');
+    assert.equal(message, 'Meta API key is valid and muse-image-1.0 is available.');
+    assert.equal(requestUrl.href, 'https://api.meta.ai/v1/models');
+    assert.equal(requestOptions.method, 'GET');
+    assert.equal(requestOptions.headers.Authorization, 'Bearer meta-test-key');
+    assert.equal(requestOptions.credentials, 'omit');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('Meta key validation reports authentication and Muse-access failures', async () => {
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.fetch = async () => new Response(JSON.stringify({ error: { message: 'Invalid API key' } }), { status: 401 });
+    await assert.rejects(validateMetaMuseApiKey('meta-test-key'), /Invalid API key/);
+
+    globalThis.fetch = async () => new Response(JSON.stringify({ data: [{ id: 'muse-spark-1.3' }] }), { status: 200 });
+    await assert.rejects(validateMetaMuseApiKey('meta-test-key'), /muse-image-1.0 is not available/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

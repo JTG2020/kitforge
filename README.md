@@ -43,7 +43,7 @@ Vite prints the local address when ready (normally <http://localhost:5173/>). To
 npm run dev -- --host 0.0.0.0
 ```
 
-In the app, open **Settings** and enter separate keys for Gemini image generation and text models. To use Muse on the Thank You page, select **Meta Muse Image** and enter its separate API key. The text-key check sends a short request through the selected free-tier model. The Gemini image-key check can optionally generate a small test image, which may incur a charge. You can seed a local development session's Gemini image key with `VITE_GEMINI_API_KEY` in a `.env.local` file, but do not commit that file or expose the development build publicly.
+In the app, open **Settings** and enter separate keys for Gemini image generation and text models. To use Muse on the Thank You page, select **Meta Muse Image** and enter its separate API key. **Test Meta Muse key** checks authentication and model access through Meta's model-list endpoint without generating an image. The text-key check sends a short request through the selected free-tier model. The Gemini image-key check can optionally generate a small test image, which may incur a charge. You can seed a local development session's Gemini image key with `VITE_GEMINI_API_KEY` in a `.env.local` file, but do not commit that file or expose the development build publicly.
 
 ## Typical workflow
 
@@ -62,7 +62,7 @@ npm run build    # Type-check and create the production build in dist/
 npm run preview  # Preview the production build locally
 ```
 
-The automated suite currently contains 25 tests covering copy resolution, custom layout, geometry, text layout and safety, free-tier model selection, Gemini text requests, Thank You image provider settings and routing, Muse generation/edit request contracts, temporary-capacity handling, and model IDs in error messages. Provider contract tests mock network access and do not make live API calls.
+The automated suite currently contains 27 tests covering copy resolution, custom layout, geometry, text layout and safety, free-tier model selection, Gemini text requests, Thank You image provider settings and routing, Muse generation/edit and key-validation request contracts, temporary-capacity handling, and model IDs in error messages. Provider contract tests mock network access and do not make live API calls.
 
 ## Print and export
 
